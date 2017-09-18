@@ -24,7 +24,7 @@ class NeuralNetwork(object):
         self._sess = None
         self._history = {'accuracy': [], 'loss': []}
         self.val_history = {'val_loss': [], 'val_acc': []}
-     
+
     #重みW[i]の初期化 
     def weight_variable(self, shape):
         in_neuron = shape[0]
@@ -122,7 +122,7 @@ class NeuralNetwork(object):
                 sess.run(train_step, feed_dict={x: X_[start:end], t: Y_[start:end], keep_prob: p_keep})
                 
             loss_ = loss.eval(session=sess, feed_dict={x: X_train, t: Y_train, keep_prob: 1.0})
-                
+
             accuracy_ = accuracy.eval(session=sess, feed_dict={x: X_train, t: Y_train, keep_prob: 1.0})
             self._history['loss'].append(loss_)
             self._history['accuracy'].append(accuracy_)
@@ -135,13 +135,37 @@ class NeuralNetwork(object):
 
             if verbose:
                 print('epoch:', epoch, ' loss:', loss_, ' accuracy:', accuracy_, ' val_loss:', val_loss, ' val_acc:', val_acc)
-    
+
+            if early_stop.validate(val_loss):
+                break
+
         return self._history
 
     def evaluate(self, X_test, Y_test):
         accuracy = self.accuracy(self._y, self._t)
         return accuracy.eval(session=self._sess, feed_dict={self._x: X_test, self._t: Y_test, self._keep_prob: 1.0})
 
+class EarlyStopping(NeuralNetwork):
+    def __init__(self, patience=0, verbose=0):
+        self.step = 0
+        self.loss = float('inf')
+        self.patience = patience
+        self.verbose = verbose
+
+    def validate(self, _loss):
+        if self.loss < _loss:
+            self.step += 1
+
+            if self.step > self.patience:
+                if self.verbose:
+                    print('early stopping')
+                return True
+
+        else:
+            self.step = 0
+            self.loss = _loss
+
+        return False
 
 if __name__ == '__main__':
 
@@ -159,7 +183,8 @@ if __name__ == '__main__':
     X_train, X_test, Y_train, Y_test =  train_test_split(X, Y, train_size=train_size, random_state=0)
 
     X_train, X_validation, Y_train, Y_validation = train_test_split(X_train, Y_train, train_size=train_size, random_state=0)
-    #keep_prob = tf.placeholder(tf.float32) #ドロップアウトしない確率
+
+    early_stop = EarlyStopping(patience=10, verbose=1)
 
     model = NeuralNetwork(n_in=784, n_hiddens=[200, 200, 200], n_out=10)
     model.fit(X_train, Y_train, epochs=epoch_size, batch_size=200, p_keep=0.5)
@@ -170,8 +195,8 @@ if __name__ == '__main__':
     plt.rc('font', family='serif')
     fig = plt.figure()
 
-    plt.plot(range(epoch_size), model.val_history['val_acc'], label='acc', color='blue')
-    plt.plot(range(epoch_size), model.val_history['val_loss'], label='loss', color='red')
+    plt.plot(range(len(model.val_history['val_acc'])), model.val_history['val_acc'], label='acc', color='blue')
+    plt.plot(range(len(model.val_history['val_acc'])), model.val_history['val_loss'], label='loss', color='red')
 
     plt.xlabel('epochs')
     plt.ylabel('validation loss')
