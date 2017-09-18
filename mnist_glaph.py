@@ -58,7 +58,8 @@ class NeuralNetwork(object):
 
     #誤差逆伝播法による誤差関数
     def loss(self, y, t):
-        cross_entropy = tf.reduce_mean(-tf.reduce_sum(t * tf.log(y), reduction_indices=[1]))
+        #tf.clip_by_value ... 値の下限値を0ではなく1e-10とし,勾配消失問題を防止
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(t * tf.log(tf.clip_by_value(y, 1e-10, 1.0)), reduction_indices=[1]))
         return cross_entropy
 
     #誤差関数を確率的勾配降下法により最小化
@@ -113,9 +114,6 @@ class NeuralNetwork(object):
             val_loss = loss.eval(session=sess, feed_dict={x: X_validation, t: Y_validation, keep_prob: 1.0})
             val_acc = accuracy.eval(session=sess, feed_dict={x: X_validation, t: Y_validation, keep_prob: 1.0})
 
-            #self.val_loss = loss.eval()
-            #self.val_acc = accuracy.eval()
-
             self.history['val_loss'].append(val_loss)
             self.history['val_acc'].append(val_acc)
 
@@ -153,12 +151,11 @@ if __name__ == '__main__':
     accuracy_rate = model.evaluate(X_test, Y_test)
     print('認証精度: ', accuracy_rate)
 
-    #history = {'val_loss': [], 'val_acc': []}
-
     plt.rc('font', family='serif')
     fig = plt.figure()
 
-    plt.plot(range(epochs), model.history['val_acc'], label='acc', color='black')
+    plt.plot(range(epochs), model.history['val_acc'], label='acc', color='blue')
+    plt.plot(range(epochs), model.history['val_loss'], label='loss', color='red')
 
     plt.xlabel('epochs')
     plt.ylabel('validation loss')
