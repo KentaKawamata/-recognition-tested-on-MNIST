@@ -4,6 +4,7 @@ import tensorflow as tf
 from sklearn.utils import shuffle
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
+import os
 
 np.random.seed(0)
 tf.set_random_seed(1234)
@@ -26,16 +27,24 @@ class NeuralNetwork(object):
         self.val_history = {'val_loss': [], 'val_acc': []}
 
     #重みW[i]の初期化 
-    def weight_variable(self, shape):
+    def weight_variable(self, shape, i):
         in_neuron = shape[0]
         out_neuron = shape[1]
         #Heの初期値
         stddev = np.sqrt( 2 / (in_neuron * out_neuron))
-        return tf.Variable(tf.truncated_normal(shape, stddev=stddev))
+        return tf.Variable(tf.truncated_normal(shape, stddev=stddev), name='W_{}'.format(i))
+
+    #出力層の重みを初期化
+    def weight_variable_out(self, shape):
+        in_neuron = shape[0]
+        out_neuron = shape[1]
+        #Heの初期値
+        stddev = np.sqrt( 2 / (in_neuron * out_neuron))
+        return tf.Variable(tf.truncated_normal(shape, stddev=stddev), name='W_out')
 
     #バイアスb[i]の初期化
     def bias_variable(self, shape):
-        return tf.Variable(tf.zeros(shape))
+        return tf.Variable(tf.zeros(shape), name='b_out')
 
     #Batch Normalizationによって,ミニバッチごとに正規化
     def batch_normalization(self, shape, u):
@@ -57,7 +66,7 @@ class NeuralNetwork(object):
                 input_dim = self.n_hiddens[i-1]
             
             #weights[-1] ... 配列weightsの一番後ろの値を取得
-            self.weights.append(self.weight_variable([input_dim, n_hidden]))
+            self.weights.append(self.weight_variable([input_dim, n_hidden], i))
             #self.biases.append(self.bias_variable([n_hidden]))
             self.u.append(tf.matmul(input, self.weights[-1])) 
             #h = tf.nn.relu(tf.matmul(input, self.weights[-1]) + self.biases[-1])
@@ -65,7 +74,7 @@ class NeuralNetwork(object):
             output = tf.nn.dropout(tf.nn.relu(h), keep_prob)
 
         #隠れ層 - 出力層
-        self.weights.append(self.weight_variable([self.n_hiddens[-1], self.n_out]))
+        self.weights.append(self.weight_variable_out([self.n_hiddens[-1], self.n_out]))
         self.bias_out = self.bias_variable([self.n_out])
         self._y = tf.nn.softmax(tf.matmul(output, self.weights[-1]) + self.bias_out)
         
@@ -105,6 +114,7 @@ class NeuralNetwork(object):
         accuracy = self.accuracy(y, t)
 
         init = tf.global_variables_initializer()
+        saver = tf.train.Saver()
         sess = tf.Session()
         sess.run(init)
         self._sess = sess
@@ -139,6 +149,9 @@ class NeuralNetwork(object):
             if early_stop.validate(val_loss):
                 break
 
+        model_path = saver.save(sess, MODEL_DIR + '/model.ckpt')
+        print('Model saved to:', model_path)
+        
         return self._history
 
     def evaluate(self, X_test, Y_test):
@@ -169,6 +182,10 @@ class EarlyStopping(NeuralNetwork):
 
 if __name__ == '__main__':
 
+    MODEL_DIR = os.path.join(os.path.dirname(__file__), 'model')
+    if os.path.exists(MODEL_DIR) is False:
+        os.mkdir(MODEL_DIR)
+
     mnist = datasets.fetch_mldata('MNIST original', data_home = '.')
     
     n = len(mnist.data) 
@@ -188,7 +205,7 @@ if __name__ == '__main__':
 
     model = NeuralNetwork(n_in=784, n_hiddens=[200, 200, 200], n_out=10)
     model.fit(X_train, Y_train, epochs=epoch_size, batch_size=200, p_keep=0.5)
-    
+     
     accuracy_rate = model.evaluate(X_test, Y_test)
     print('認証精度: ', accuracy_rate)
 
